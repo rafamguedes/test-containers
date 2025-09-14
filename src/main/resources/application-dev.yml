@@ -26,5 +26,3 @@ spring:
     refresh:
       token:
         expiration: 1440
-server:
-  port: 8080
