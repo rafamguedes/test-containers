@@ -25,7 +25,7 @@ public class UserController {
   private final UserService userService;
 
   @PostMapping
-  @PreAuthorize("permitAll()")
+  @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<UserResponseDto> save(@Valid @RequestBody UserRequestDto requestDto) {
     var response = userService.save(requestDto);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -41,7 +41,7 @@ public class UserController {
   @PutMapping("/{id}")
   @PreAuthorize("hasRole('ADMIN')")
   public ResponseEntity<Void> update(
-      @PathVariable Long id, @RequestBody UserUpdateRequestDto requestDto) {
+      @PathVariable Long id, @Valid @RequestBody UserUpdateRequestDto requestDto) {
     userService.update(id, requestDto);
     return ResponseEntity.noContent().build();
   }

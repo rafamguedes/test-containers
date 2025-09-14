@@ -29,6 +29,7 @@ public class UserService implements UserDetailsService {
     var user = userMapper.toEntity(requestDto);
     user.setPassword(getEncodePassword(requestDto));
     user.setRole(RoleEnum.USER);
+    
     var savedUser = userRepository.save(user);
     return userMapper.toResponseDto(savedUser);
   }
@@ -67,13 +68,8 @@ public class UserService implements UserDetailsService {
 
   @Override
   public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-    try {
-      return userRepository
-          .findByEmail(email)
-          .orElseThrow(() -> new UsernameNotFoundException(USER_EMAIL_NOT_FOUND + email));
-    } catch (UsernameNotFoundException e) {
-      log.error("Authentication error: {}", e.getMessage());
-      throw e;
-    }
+    return userRepository
+        .findByEmail(email)
+        .orElseThrow(() -> new UsernameNotFoundException(USER_EMAIL_NOT_FOUND + email));
   }
 }

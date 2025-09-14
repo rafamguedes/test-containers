@@ -39,37 +39,48 @@ public class JwtFilter extends OncePerRequestFilter {
       @NonNull HttpServletResponse response,
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
+
     try {
-      var token = extractToken(request);
-      if (token.isPresent()) {
-        log.debug("Token found: {}", token.get());
+      Optional<String> token = extractToken(request);
 
-        // Extract email and roles from token
-        var email = tokenService.validateToken(token.get());
-        log.debug("Token subject: {}", email);
-
-        // Get user details to get authorities
-        var userDetails = userService.loadUserByUsername(email);
-        log.debug("User authorities: {}", userDetails.getAuthorities());
-
-        var authentication =
-            new UsernamePasswordAuthenticationToken(
-                userDetails, null, userDetails.getAuthorities());
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        log.debug("Authentication set in security context");
-      } else {
+      if (token.isEmpty()) {
         log.debug("No token found in request");
+        filterChain.doFilter(request, response);
+        return;
       }
+
+      String tokenValue = token.get();
+      log.debug("Token found: {}", tokenValue);
+
+      // 1. Verifica se token foi invalidado
+      if (tokenService.isTokenInvalid(tokenValue)) {
+        log.warn("Attempt to use revoked token");
+        sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token revogado");
+        return;
+      }
+
+      // 2. Valida token e extrai email
+      String email = tokenService.validateToken(tokenValue);
+      log.debug("Token subject: {}", email);
+
+      // 3. Carrega UserDetails (ou usa authorities do token)
+      var userDetails = userService.loadUserByUsername(email);
+      log.debug("User authorities: {}", userDetails.getAuthorities());
+
+      // 4. Cria autenticação
+      var authentication =
+          new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+      SecurityContextHolder.getContext().setAuthentication(authentication);
+      log.debug("Authentication set in security context");
+
     } catch (IllegalArgumentException e) {
-      log.error("Error validating token: {}", e.getMessage());
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-      response.getWriter().write("Invalid or expired token");
+      handleJwtException(e, response);
       return;
     } catch (Exception e) {
-      log.error("Unexpected error: {}", e.getMessage(), e);
-      response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-      response.getWriter().write("Internal server error");
+      log.error("Unexpected error during JWT filtering: {}", e.getMessage(), e);
+      sendErrorResponse(
+          response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
       return;
     }
 
@@ -77,10 +88,38 @@ public class JwtFilter extends OncePerRequestFilter {
   }
 
   private Optional<String> extractToken(HttpServletRequest request) {
-    var authHeader = request.getHeader(AUTHORIZATION);
+    String authHeader = request.getHeader(AUTHORIZATION);
     if (authHeader == null || !authHeader.startsWith(BEARER)) {
       return Optional.empty();
     }
     return Optional.of(authHeader.substring(BEARER.length()));
+  }
+
+  private void handleJwtException(IllegalArgumentException e, HttpServletResponse response)
+      throws IOException {
+    String message = e.getMessage();
+    log.error("JWT validation error: {}", message);
+
+    if (message.contains("expirado")) {
+      sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token expirado");
+    } else if (message.contains("revogado") || message.contains("inválido")) {
+      sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Token inválido");
+    } else {
+      sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Erro de autenticação");
+    }
+  }
+
+  private void sendErrorResponse(HttpServletResponse response, int status, String message)
+      throws IOException {
+    response.setStatus(status);
+    response.setContentType("application/json");
+    response.getWriter().write("{\"error\": \"" + message + "\"}");
+  }
+
+  // Opcional: Pular filtro para endpoints públicos
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    String path = request.getRequestURI();
+    return path.startsWith("/auth/login") || path.startsWith("/auth/refresh");
   }
 }

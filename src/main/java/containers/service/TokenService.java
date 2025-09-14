@@ -17,10 +17,7 @@ import java.util.stream.Collectors;
 public class TokenService {
 
   private final Algorithm algorithm;
-  private final UserService userService;
-
-  @Value("${spring.security.token.secret}")
-  private String secret;
+  private final Set<String> invalidatedTokens = ConcurrentHashMap.newKeySet();
 
   @Value("${spring.security.token.expiration}")
   private Long accessTokenExpiration;
@@ -28,51 +25,39 @@ public class TokenService {
   @Value("${spring.security.refresh.token.expiration}")
   private Long refreshTokenExpiration;
 
-  // Set to store invalidated tokens
-  private final Set<String> invalidatedTokens = ConcurrentHashMap.newKeySet();
-
-  public TokenService(
-      @Value("${spring.security.token.secret}") String secret, UserService userService) {
+  public TokenService(@Value("${spring.security.token.secret}") String secret) {
     this.algorithm = Algorithm.HMAC256(secret);
-    this.userService = userService;
   }
 
   public String generateToken(String email) {
-    var userDetails = userService.loadUserByUsername(email);
-    var roles =
-        userDetails.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .collect(Collectors.toList());
-
     return JWT.create()
         .withSubject(email)
-        .withClaim("roles", roles)
-        .withExpiresAt(new Date(System.currentTimeMillis() + 3600000))
+        .withExpiresAt(calculateExpiration(accessTokenExpiration * 60 * 1000)) // minutes to ms
         .sign(algorithm);
-  }
-
-  private Instant generateExpiration() {
-    return Instant.now().plus(accessTokenExpiration, ChronoUnit.MINUTES);
-  }
-
-  public String validateToken(String token) {
-    if (isTokenInvalid(token)) {
-      throw new IllegalArgumentException("Token inválido ou revogado");
-    }
-    try {
-      return JWT.require(algorithm).build().verify(token).getSubject();
-    } catch (com.auth0.jwt.exceptions.TokenExpiredException e) {
-      throw new IllegalArgumentException("Token expirado", e);
-    } catch (com.auth0.jwt.exceptions.JWTVerificationException e) {
-      throw new IllegalArgumentException("Token inválido", e);
-    }
   }
 
   public String generateRefreshToken(String email) {
     return JWT.create()
         .withSubject(email)
-        .withExpiresAt(Instant.now().plus(refreshTokenExpiration, ChronoUnit.HOURS))
+        .withExpiresAt(calculateExpiration(refreshTokenExpiration * 60 * 60 * 1000)) // hours to ms
         .sign(algorithm);
+  }
+
+  private Date calculateExpiration(long expirationMs) {
+    return new Date(System.currentTimeMillis() + expirationMs);
+  }
+
+  public String validateToken(String token) {
+    if (isTokenInvalid(token)) {
+      throw new IllegalArgumentException("Invalid token - token has been revoked");
+    }
+    try {
+      return JWT.require(algorithm).build().verify(token).getSubject();
+    } catch (com.auth0.jwt.exceptions.TokenExpiredException e) {
+      throw new IllegalArgumentException("Expiration token ", e);
+    } catch (com.auth0.jwt.exceptions.JWTVerificationException e) {
+      throw new IllegalArgumentException("Invalid token ", e);
+    }
   }
 
   public void invalidateToken(String token) {

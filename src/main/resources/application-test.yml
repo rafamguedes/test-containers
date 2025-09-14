@@ -17,7 +17,19 @@ spring:
   security:
     token:
       secret: your-secret-key
-      expiration: 60
+      expiration: 3600000
     refresh:
       token:
-        expiration: 1440
+        expiration: 86400000
+
+admin:
+  email: "admin-test@admin.com"
+  password: "$2a$12$8j9O14u/JCXQ6vO75X0RaesViv/yczajA40qhAKjkSkIrpQ6FEltK"
+  password-decrypted: "secret_admin_test"
+  first-name: "Admin Test"
+
+user:
+  email: "user-test@user.com"
+  password: "$2a$12$ez6gIcPAotEqx4Wd6Uea6.Rgugyo4428nOgVCNj3HzMHwuVIiTw5y"
+  password-decrypted: "secret_user_test"
+  first-name: "User Test"

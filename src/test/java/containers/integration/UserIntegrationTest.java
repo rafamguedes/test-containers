@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import containers.entity.User;
 import containers.security.RoleEnum;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 
 public class UserIntegrationTest extends BaseIntegrationTest {
@@ -13,32 +14,29 @@ public class UserIntegrationTest extends BaseIntegrationTest {
   private static final String BASE_URL = "/users/%s";
   private static final String USER_NOT_FOUND_MESSAGE = "User not found for ID: ";
 
-  private User userMock() {
-    return User.builder()
-        .name("João")
-        .email("joao@email.com")
-        .password(passwordEncoder.encode("12345678"))
-        .role(RoleEnum.USER)
-        .build();
-  }
-
   @Test
   public void shouldCreateUserSuccessfully() throws Exception {
     var userJsonRequest =
-        """
+        String.format(
+            """
             {
-              "name": "João",
-              "email": "joao@email.com",
-              "password": "12345678"
+              "name": "%s",
+              "email": "%s",
+              "password": "%s"
             }
-            """;
+            """,
+            userFirstName, userEmail, userPasswordDecrypted);
 
     mockMvc
-        .perform(post("/users").contentType(MediaType.APPLICATION_JSON).content(userJsonRequest))
+        .perform(
+            post("/users")
+                .header("Authorization", jwtToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(userJsonRequest))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").isNumber())
-        .andExpect(jsonPath("$.name").value("João"))
-        .andExpect(jsonPath("$.email").value("joao@email.com"));
+        .andExpect(jsonPath("$.name").value(userFirstName))
+        .andExpect(jsonPath("$.email").value(userEmail));
   }
 
   @Test

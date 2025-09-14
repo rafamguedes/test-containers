@@ -15,14 +15,18 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-        use_sql_comments: true
-        jdbc:
-          lob:
-            non_contextual_creation: true
+  sql:
+    init:
+      mode: always
   security:
     token:
-      secret: mySecretKeyWord
+      secret: "mySuperSecretKeyWithAtLeast32Characters!!"
       expiration: 60
     refresh:
       token:
         expiration: 1440
+
+admin:
+  email: admin@admin.com
+  password: "$2a$12$Ftg9Me9WdLA/d3fPgs4ySu1.V2p/iZ4pHSLfK3Oqk/GvbHjNsW3M."
+  first-name: "Admin"
