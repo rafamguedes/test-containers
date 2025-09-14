@@ -1,0 +1,30 @@
+# Development environment configuration
+spring:
+  application:
+    name: containers
+  datasource:
+    url: jdbc:postgresql://localhost:5432/test_containers_db
+    username: root
+    password: root
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  security:
+    token:
+      secret: mySecretKeyWord
+      expiration: 60
+    refresh:
+      token:
+        expiration: 1440
+server:
+  port: 8080
